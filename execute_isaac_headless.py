@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
 Isaac Sim Headless Execution Script
-Loads a USD file, runs physics simulation, and renders to MP4 video
+Loads a USD file, runs physics simulation, and renders to MP4 using the native Movie Capture tool.
 """
 
 import argparse
 import sys
-import subprocess
+import asyncio
 from pathlib import Path
 
 # Isaac Sim imports
@@ -63,6 +63,139 @@ def parse_args():
     return parser.parse_args()
 
 
+async def run_simulation_and_render(args):
+    """The core asynchronous task to run simulation and capture video."""
+
+    # Import necessary modules after app start
+    import omni.timeline
+    import omni.usd
+    from omni.isaac.core import World
+    from omni.isaac.core.utils.stage import open_stage
+
+    try:
+        import omni.kit.capture.viewport as movie_capture
+        use_movie_capture = True
+    except ImportError:
+        print("⚠️  Warning: Movie capture module not available, trying alternative...")
+        try:
+            import omni.kit.movie_capture as movie_capture
+            use_movie_capture = True
+        except ImportError:
+            use_movie_capture = False
+            print("⚠️  Movie capture not available, simulation will run without recording")
+
+    # Load the USD stage
+    print(f"\n📂 Loading USD scene: {args.usd_path}")
+    open_stage(str(args.usd_path))
+
+    # Verify stage loaded
+    stage = omni.usd.get_context().get_stage()
+    if stage is None:
+        raise RuntimeError("Failed to load USD stage")
+
+    print("✅ USD stage loaded successfully")
+
+    # Initialize physics world
+    print("\n⚛️  Initializing physics simulation...")
+    world = World(physics_dt=1.0 / args.fps)
+
+    # Use async initialization if available
+    try:
+        await world.initialize_simulation_context_async()
+    except AttributeError:
+        # Fallback to sync if async not available
+        world.initialize_simulation_context()
+
+    await world.reset_async()
+    print("✅ Physics simulation initialized")
+
+    if use_movie_capture:
+        # Configure movie capture
+        print(f"\n🎥 Setting up movie capture...")
+
+        try:
+            mc_interface = movie_capture.get_movie_capture_interface()
+
+            # Configure capture settings
+            output_dir = str(args.output_path.parent)
+            output_name = args.output_path.stem
+
+            capture_settings = {
+                "output_path": output_dir,
+                "name": output_name,
+                "resolution": (args.width, args.height),
+                "fps": args.fps,
+                "file_format": "mp4",
+                "duration": args.duration,
+            }
+
+            # Try different API versions
+            try:
+                mc_interface.set_capture_settings(capture_settings)
+            except:
+                # Alternative API
+                mc_interface.set_output_directory(output_dir)
+                mc_interface.set_file_name(output_name)
+                mc_interface.set_resolution(args.width, args.height)
+                mc_interface.set_fps(args.fps)
+
+            print(f"   Output: {args.output_path}")
+            print(f"   Duration: {args.duration}s @ {args.fps} FPS")
+            print("✅ Movie capture configured")
+
+            # Start capturing
+            print("\n🎬 Starting video capture...")
+            mc_interface.start_capture()
+
+        except Exception as e:
+            print(f"⚠️  Warning: Could not start movie capture: {e}")
+            print("   Simulation will run without recording")
+            use_movie_capture = False
+
+    # Get timeline
+    timeline = omni.timeline.get_timeline_interface()
+    timeline.set_time_codes_per_seconds(args.fps)
+
+    # Start the simulation
+    print("\n▶️  Starting simulation...")
+    timeline.play()
+
+    # Run simulation for specified duration
+    total_frames = int(args.duration * args.fps)
+    print(f"   Running {total_frames} frames...")
+
+    for frame in range(total_frames):
+        # Step the world
+        await world.step_async(render=True)
+
+        # Progress indicator
+        if frame % args.fps == 0:
+            progress = (frame / total_frames) * 100
+            print(f"   Progress: {progress:.1f}% ({frame}/{total_frames} frames)")
+
+    # Stop timeline
+    timeline.stop()
+    print("\n✅ Simulation complete!")
+
+    if use_movie_capture:
+        try:
+            # Wait for capture to finish
+            print("\n🎥 Finalizing video encoding...")
+
+            try:
+                await mc_interface.wait_for_capture_end_async()
+            except AttributeError:
+                # Fallback: just stop capture
+                mc_interface.stop_capture()
+                # Give it some time to finish
+                await asyncio.sleep(2)
+
+            print("✅ Video capture complete!")
+
+        except Exception as e:
+            print(f"⚠️  Warning during video finalization: {e}")
+
+
 def main():
     """Main execution function"""
 
@@ -78,9 +211,9 @@ def main():
     output_dir = output_path.parent
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Temporary directory for frames
-    frames_dir = output_dir / "frames_temp"
-    frames_dir.mkdir(exist_ok=True)
+    # Update args with Path objects
+    args.usd_path = usd_path
+    args.output_path = output_path
 
     print("="*70)
     print("🎬 ISAAC SIM HEADLESS RENDERER")
@@ -100,177 +233,21 @@ def main():
         "height": args.height,
     })
 
-    # Now we can import other Isaac modules (must be after SimulationApp creation)
-    import omni.usd
-    import omni.timeline
-    from omni.isaac.core import World
-    from omni.isaac.core.utils.stage import open_stage
+    print("✅ Isaac Sim initialized successfully")
 
     try:
-        import omni.replicator.core as rep
-        use_replicator = True
-    except ImportError:
-        print("⚠️  Warning: Replicator not available, using fallback frame capture")
-        use_replicator = False
-
-    try:
-        print("✅ Isaac Sim initialized successfully")
-
-        # Load the USD stage
-        print(f"\n📂 Loading USD scene: {usd_path}")
-        open_stage(str(usd_path))
-
-        # Get the stage
-        stage = omni.usd.get_context().get_stage()
-        if stage is None:
-            raise RuntimeError("Failed to load USD stage")
-
-        print("✅ USD stage loaded successfully")
-
-        # Create World for physics simulation
-        print("\n⚛️  Initializing physics simulation...")
-        world = World(physics_dt=1.0 / args.fps)
-        world.reset()
-
-        print("✅ Physics simulation initialized")
-
-        # Setup video capture
-        print(f"\n🎥 Setting up video capture...")
-
-        if use_replicator:
-            # Try to find a camera in the scene
-            camera_path = None
-            for prim in stage.Traverse():
-                if prim.GetTypeName() == "Camera":
-                    camera_path = str(prim.GetPath())
-                    break
-
-            if not camera_path:
-                # Create a default camera if none exists
-                print("   Creating default camera...")
-                camera_path = "/World/Camera"
-                from pxr import UsdGeom, Gf
-                camera = UsdGeom.Camera.Define(stage, camera_path)
-                camera.CreateFocalLengthAttr(35)
-                xformable = UsdGeom.Xformable(camera)
-                xform_op = xformable.AddTranslateOp()
-                xform_op.Set(Gf.Vec3d(0, -5, 2))
-
-            print(f"   Using camera: {camera_path}")
-
-            # Create render product
-            render_product = rep.create.render_product(camera_path, (args.width, args.height))
-
-            # Create writer for frames
-            writer = rep.WriterRegistry.get("BasicWriter")
-            writer.initialize(
-                output_dir=str(frames_dir),
-                rgb=True,
-            )
-            writer.attach([render_product])
-
-            print("✅ Replicator video writer attached")
-
-        # Get timeline
-        timeline = omni.timeline.get_timeline_interface()
-
-        # Calculate total frames
-        total_frames = int(args.duration * args.fps)
-        dt = 1.0 / args.fps
-
-        print(f"\n   Total frames: {total_frames}")
-        print(f"   Time step: {dt:.4f}s")
-
-        # Start timeline
-        timeline.set_time_codes_per_seconds(args.fps)
-        timeline.play()
-
-        print("\n🎬 Running simulation...")
-
-        # Run simulation frame by frame
-        frames_rendered = 0
-        for frame in range(total_frames):
-            # Step physics
-            world.step(render=True)
-
-            if use_replicator:
-                # Trigger Replicator to save frame
-                rep.orchestrator.step()
-
-            # Progress indicator
-            if frame % args.fps == 0:
-                progress = (frame / total_frames) * 100
-                print(f"   Progress: {progress:.1f}% ({frame}/{total_frames} frames)")
-
-            frames_rendered += 1
-
-        # Stop timeline
-        timeline.stop()
-
-        print(f"\n✅ Simulation complete! Rendered {frames_rendered} frames")
-
-        # Encode frames to video using ffmpeg
-        if use_replicator and frames_dir.exists():
-            print("\n📹 Encoding frames to video...")
-
-            # Find the frame files
-            frame_files = sorted(frames_dir.glob("rgb_*.png"))
-
-            if frame_files:
-                print(f"   Found {len(frame_files)} frame files")
-
-                # Check if ffmpeg is available
-                try:
-                    ffmpeg_check = subprocess.run(
-                        ["ffmpeg", "-version"],
-                        capture_output=True,
-                        timeout=5
-                    )
-
-                    if ffmpeg_check.returncode == 0:
-                        # Create video with ffmpeg
-                        ffmpeg_cmd = [
-                            "ffmpeg",
-                            "-y",  # Overwrite output
-                            "-framerate", str(args.fps),
-                            "-pattern_type", "glob",
-                            "-i", str(frames_dir / "rgb_*.png"),
-                            "-c:v", "libx264",
-                            "-pix_fmt", "yuv420p",
-                            "-preset", "fast",
-                            str(output_path)
-                        ]
-
-                        result = subprocess.run(
-                            ffmpeg_cmd,
-                            capture_output=True,
-                            text=True,
-                            timeout=120
-                        )
-
-                        if result.returncode == 0 and output_path.exists():
-                            print(f"✅ Video encoded successfully: {output_path}")
-
-                            # Clean up frame files
-                            print("   Cleaning up temporary frames...")
-                            for frame_file in frame_files:
-                                frame_file.unlink()
-                            frames_dir.rmdir()
-                        else:
-                            print(f"⚠️  ffmpeg encoding failed:")
-                            print(result.stderr)
-                    else:
-                        print("⚠️  ffmpeg not working properly")
-
-                except (subprocess.TimeoutExpired, FileNotFoundError) as e:
-                    print(f"⚠️  ffmpeg not available: {e}")
-                    print(f"   Frame files saved to: {frames_dir}")
-            else:
-                print("⚠️  No frame files found")
+        # Run the main async simulation
+        asyncio.run(run_simulation_and_render(args))
 
         print("\n" + "="*70)
-        print("✅ EXECUTION COMPLETE")
+        print("🎉 EXECUTION COMPLETE")
         print("="*70)
+
+        if output_path.exists():
+            print(f"✅ Video saved: {output_path}")
+        else:
+            print(f"⚠️  Video file not found at: {output_path}")
+            print("   Check if movie capture module is available in your Isaac Sim installation")
 
     except Exception as e:
         print(f"\n❌ ERROR during execution: {e}")
