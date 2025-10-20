@@ -18,5 +18,5 @@ echo ""
 # Activate virtual environment
 source venv311/bin/activate
 
-# Launch the generative UI
-python generative_ui.py
+# Launch the generative UI (standalone version that works without full agent setup)
+python generative_ui_standalone.py
