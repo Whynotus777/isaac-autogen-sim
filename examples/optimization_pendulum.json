@@ -1,0 +1,65 @@
+{
+  "problem_name": "pendulum_swing_up",
+  "description": "Find optimal torque sequence to swing up a pendulum to upright position",
+  "objective": "minimize",
+  "metrics": [
+    {
+      "name": "angle_from_upright",
+      "prim_path": "/World/Pendulum/Bob",
+      "metric_type": "position",
+      "target_position": [0.0, 0.0, 1.0],
+      "weight": 1.0
+    },
+    {
+      "name": "angular_velocity",
+      "prim_path": "/World/Pendulum/Bob",
+      "metric_type": "velocity",
+      "weight": 0.1
+    }
+  ],
+  "parameters": [
+    {
+      "name": "torque_amplitude",
+      "prim_path": "/World/Pendulum/Joint",
+      "parameter_type": "torque",
+      "initial_value": 5.0,
+      "min_value": 0.0,
+      "max_value": 50.0,
+      "learning_rate": 0.5,
+      "requires_grad": true
+    },
+    {
+      "name": "torque_frequency",
+      "prim_path": "/World/Pendulum/Joint",
+      "parameter_type": "control_signal",
+      "initial_value": 2.0,
+      "min_value": 0.1,
+      "max_value": 10.0,
+      "learning_rate": 0.1,
+      "requires_grad": true
+    }
+  ],
+  "optimizer_config": {
+    "optimizer_type": "adam",
+    "learning_rate": 0.05,
+    "learning_rate_decay": 0.98,
+    "momentum": 0.9,
+    "beta1": 0.9,
+    "beta2": 0.999,
+    "epsilon": 1e-8,
+    "clip_grad_norm": 5.0
+  },
+  "termination": {
+    "max_iterations": 200,
+    "tolerance": 0.05,
+    "min_improvement": 0.001,
+    "patience": 20
+  },
+  "simulation": {
+    "num_steps": 500,
+    "time_step": 0.01,
+    "enable_gradients": true,
+    "gradient_mode": "auto"
+  },
+  "constraints": ["torque_amplitude > 0", "energy < max_energy"]
+}

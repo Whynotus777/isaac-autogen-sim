@@ -1,0 +1,147 @@
+{
+  "name": "falling_block",
+  "description": "A simple example of a block falling onto a table due to gravity",
+  "scene": {
+    "scene_name": "falling_block",
+    "description": "Table and block scene",
+    "commands": [
+      {
+        "command_type": "CreatePrim",
+        "prim_path": "/World/Table",
+        "prim_type": "Cube",
+        "scale": {"x": 2.0, "y": 1.0, "z": 0.1},
+        "visible": true
+      },
+      {
+        "command_type": "SetTransform",
+        "prim_path": "/World/Table",
+        "position": {"x": 0.0, "y": 0.0, "z": 0.5}
+      },
+      {
+        "command_type": "SetMaterial",
+        "prim_path": "/World/Table",
+        "material_name": "WoodMaterial",
+        "properties": {
+          "diffuse_color": {"r": 0.6, "g": 0.4, "b": 0.2, "a": 1.0},
+          "metallic": 0.0,
+          "roughness": 0.8,
+          "opacity": 1.0
+        }
+      },
+      {
+        "command_type": "CreatePrim",
+        "prim_path": "/World/Block",
+        "prim_type": "Cube",
+        "scale": {"x": 0.3, "y": 0.3, "z": 0.3},
+        "visible": true
+      },
+      {
+        "command_type": "SetTransform",
+        "prim_path": "/World/Block",
+        "position": {"x": 0.0, "y": 0.0, "z": 2.0}
+      },
+      {
+        "command_type": "SetMaterial",
+        "prim_path": "/World/Block",
+        "material_name": "RedPlastic",
+        "properties": {
+          "diffuse_color": {"r": 0.8, "g": 0.1, "b": 0.1, "a": 1.0},
+          "metallic": 0.1,
+          "roughness": 0.5,
+          "opacity": 1.0
+        }
+      },
+      {
+        "command_type": "CreateLight",
+        "light_path": "/World/Light",
+        "light_type": "DistantLight",
+        "color": {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0},
+        "intensity": 3000.0,
+        "position": {"x": 5.0, "y": 5.0, "z": 10.0}
+      },
+      {
+        "command_type": "CreateCamera",
+        "camera_path": "/World/Camera",
+        "position": {"x": 4.0, "y": 4.0, "z": 3.0},
+        "look_at": {"x": 0.0, "y": 0.0, "z": 1.0},
+        "focal_length": 50.0,
+        "fstop": 2.8
+      }
+    ]
+  },
+  "physics": {
+    "configuration_name": "falling_block_physics",
+    "description": "Physics setup for falling block simulation",
+    "commands": [
+      {
+        "command_type": "ConfigureSolver",
+        "scene_path": "/World/PhysicsScene",
+        "settings": {
+          "time_step": 0.016666,
+          "position_iterations": 4,
+          "velocity_iterations": 1,
+          "gravity": {"x": 0.0, "y": 0.0, "z": -9.81},
+          "enable_ccd": false,
+          "enable_stabilization": true,
+          "broadphase_type": "GPU"
+        }
+      },
+      {
+        "command_type": "ApplyRigidBody",
+        "prim_path": "/World/Table",
+        "properties": {
+          "mass": 50.0,
+          "linear_damping": 0.0,
+          "angular_damping": 0.05,
+          "initial_linear_velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "initial_angular_velocity": {"x": 0.0, "y": 0.0, "z": 0.0}
+        },
+        "is_kinematic": true
+      },
+      {
+        "command_type": "ApplyCollider",
+        "prim_path": "/World/Table",
+        "collider_type": "Box",
+        "offset": {"x": 0.0, "y": 0.0, "z": 0.0},
+        "collision_group": 0
+      },
+      {
+        "command_type": "SetFriction",
+        "prim_path": "/World/Table",
+        "properties": {
+          "static_friction": 0.6,
+          "dynamic_friction": 0.5,
+          "restitution": 0.2
+        }
+      },
+      {
+        "command_type": "ApplyRigidBody",
+        "prim_path": "/World/Block",
+        "properties": {
+          "mass": 1.0,
+          "linear_damping": 0.0,
+          "angular_damping": 0.05,
+          "initial_linear_velocity": {"x": 0.0, "y": 0.0, "z": 0.0},
+          "initial_angular_velocity": {"x": 0.0, "y": 0.0, "z": 0.0}
+        },
+        "is_kinematic": false
+      },
+      {
+        "command_type": "ApplyCollider",
+        "prim_path": "/World/Block",
+        "collider_type": "Box",
+        "offset": {"x": 0.0, "y": 0.0, "z": 0.0},
+        "collision_group": 0
+      },
+      {
+        "command_type": "SetFriction",
+        "prim_path": "/World/Block",
+        "properties": {
+          "static_friction": 0.7,
+          "dynamic_friction": 0.6,
+          "restitution": 0.3
+        }
+      }
+    ]
+  }
+}

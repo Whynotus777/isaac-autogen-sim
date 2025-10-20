@@ -1,0 +1,76 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+venv311/
+ENV/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+venv311/
+ENV/
+env/
+
+# Isaac Sim & Isaac Lab
+IsaacLab/
+_isaac_sim/
+*.usd
+*.usda
+*.usdc
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
+# Model checkpoints
+*.pth
+*.ckpt
+*.pt
+
+# Data files
+data/
+datasets/
+*.h5
+*.hdf5
+
+# Output files
+output/
+results/
+*.mp4
+*.avi
+*.gif
